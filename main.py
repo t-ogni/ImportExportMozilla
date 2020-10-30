@@ -95,8 +95,8 @@ for logins in profiles_logins:
                                 (l['login'] == login['login'] or
                                  l['password'] == login['password']):
                             l_found.append(l)
-                    replace_index = all_logins.index(l_found[l_id])
-                    all_logins[replace_index] = l
+                    mozbp.delNewLogin(key, jsonLogins, l)
+                    mozbp.addNewLogin(key, global_json, login)
                     break
 
                 elif i == 's':

@@ -201,6 +201,28 @@ def addNewLogin(key, jsonLogins, login):
     jsonLogins["nextId"] += 1
 
 
+def delNewLogin(key, jsonLogins, login):
+    replace_index = getLogin(
+        login['hostname'],
+        login["login"],
+        login['password'],
+        key, jsonLogins
+    )
+    del jsonLogins['logins'][replace_index]
+    jsonLogins["nextId"] -= 1
+
+
+def getLogin(url, login, password, key, jsonLogins):
+    logins = exportLogins(key, jsonLogins, ['hostname', 'login', 'password'])
+    index = logins.index({
+        'hostname': url,
+        'login': login,
+        'password': password
+    })
+    return index
+
+
+
 def findProfiles():
     dirs = {
         "darwin": "~/Library/Application Support/Firefox",
@@ -217,7 +239,7 @@ def findProfiles():
         out_profiles = []
         for profile in profiles:
             profile_temp = {
-                'path':  path / config[profile]["Path"],
+                'path': path / config[profile]["Path"],
                 'name': config[profile]["Name"]
             }
             out_profiles.append(profile_temp)
@@ -238,5 +260,3 @@ def askpass(directory):
         else:
             break
     return key
-
-
