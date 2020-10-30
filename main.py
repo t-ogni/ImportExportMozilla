@@ -1,9 +1,25 @@
-# import csv
 from pathlib import Path, PureWindowsPath
 import mozbp  # mozilla bypass
+import sys
+from shutil import copy2  # copy files
 
 profile_paths = []
-output_path = './'
+output_path = Path('./profile/')
+
+copy_list = '''\
+%profile%\\content-prefs.sqlite
+%profile%\\cookies.sqlite
+%profile%\\favicons.sqlite
+%profile%\\key4.db
+%profile%\\permissions.sqlite
+%profile%\\places.sqlite
+%profile%\\sessionstore.jsonlz4\
+'''.split('\n')
+to_copy = False
+
+if not output_path.exists():
+    output_path.mkdir()
+
 profiles = mozbp.findProfiles()
 print('which profile need to use?')
 for i, pr in enumerate(profiles):
@@ -19,25 +35,33 @@ while True:
         else:
             print("need more profiles to merge")
 
+    elif com.isdigit():
+        profile_paths.append(profiles[int(com)]['path'])
+        print("added")
+
     elif com in ('h', 'help'):
         print(
             "h, help - call this menu \n"
             "%num% - choose profile \n"
             "p, %path% - write your path. ('//%path%' for server)\n"
             "brk, enter (clear string) - continue \n"
+            "c - copy files ('Джентельменский Набор') [ratio]"
         )
 
     elif com == 'p':
         profile_paths.append(Path(input("path: ")))
         print("added")
 
-    elif com.isdigit():
-        profile_paths.append(profiles[int(com)]['path'])
-        print("added")
+    elif com == 'c':
+        to_copy = not to_copy
+        print(f'ratio swiched to {to_copy}')
 
     else:
         if com.startswith("//"):
-            path = PureWindowsPath(com)
+            if sys.platform in ('win32', 'cygwin'):
+                path = PureWindowsPath(com)  # windows
+            else:
+                path = Path(com)  # linux
         else:
             path = Path(com)
 
@@ -66,8 +90,20 @@ for ITEM_ID, profile in enumerate(profile_paths):
     logins = mozbp.exportLogins(key, jsonLogins, ['hostname', 'login', 'password', 'timePasswordChanged'])
     profiles_logins.append(logins)
 
+
+if to_copy:
+    print(f"\n copying files to {output_path.absolute()}")
+    for copy_file in copy_list:
+        try:
+            copy2(copy_file.replace('%profile%', str(profile_paths[0].absolute())),
+                 str(output_path.absolute()) + copy_file.replace('%profile%', ''))
+        except Exception as err:
+            print(f"something went wrong: {err}")
+    print()
+
 all_logins = profiles_logins[0]
 global_json = json_logins[0]
+all_logins[0]['password'] = 'wqdf'
 for logins in profiles_logins:
     for login in logins:
         if login not in all_logins:
@@ -109,7 +145,7 @@ for logins in profiles_logins:
                         if l['hostname'] == login['hostname'] and \
                                 (l['login'] == login['login'] or
                                  l['password'] == login['password']):
-                            print("description  | old                     | new ")
+                            print("description  | old                      | new ")
                             print(f"login        | {l['login']:<25}| {login['login']:<25}")
                             print(f"password     | {l['password']:<25}| {login['password']:<25}")
                             print(f"modify-time  | {l['timePasswordChanged']:<25}| {login['timePasswordChanged']:<25} \n")
@@ -120,16 +156,12 @@ for logins in profiles_logins:
                         print(f"password    | {l['password']:<25}")
                         print(f"modify-time | {l['timePasswordChanged']:<25}\n")
 
-mozbp.dumpJsonLogins(Path(output_path), global_json)
+mozbp.dumpJsonLogins(output_path, global_json)
 #   ./profiles/nn
 
-'''
-%APPDATA%\Mozilla\Firefox\Profiles\*\content-prefs.sqlite
-%APPDATA%\Mozilla\Firefox\Profiles\*\cookies.sqlite
-%APPDATA%\Mozilla\Firefox\Profiles\*\favicons.sqlite
-%APPDATA%\Mozilla\Firefox\Profiles\*\key4.db
-%APPDATA%\Mozilla\Firefox\Profiles\*\logins.json
-%APPDATA%\Mozilla\Firefox\Profiles\*\permissions.sqlite
-%APPDATA%\Mozilla\Firefox\Profiles\*\places.sqlite
-%APPDATA%\Mozilla\Firefox\Profiles\*\sessionstore.jsonlz4
+
+''' network dir solution
+os.chdir(join(r'//server-01', 'directory', 'filename.txt'))
+path = Path()
+path = path.resolve()
 '''

@@ -188,7 +188,7 @@ def addNewLogin(key, jsonLogins, login):
         "formSubmitURL": "",
         "usernameField": "",
         "passwordField": "",
-        "encryptedUsername": encodeLoginData(key, login['username']),
+        "encryptedUsername": encodeLoginData(key, login['login']),
         "encryptedPassword": encodeLoginData(key, login['password']),
         "guid": "{%s}" % uuid4(),
         "encType": 1,
