@@ -63,9 +63,6 @@ def getKey(directory: Path, masterPassword=""):
     )  # usual Mozilla PBE
     if clearText != b"password-check\x02\x02":
         raise WrongPassword()
-
-    print("password is right")
-
     # decrypt 3des key to decrypt "logins.json" content
 
     c.execute("SELECT a11,a102 FROM nssPrivate;")
@@ -78,7 +75,6 @@ def getKey(directory: Path, masterPassword=""):
     entrySalt = decodedA11[0][1][0].asOctets()
     cipherT = decodedA11[1].asOctets()
     key = decrypt3DES(globalSalt, masterPassword, entrySalt, cipherT)
-    print("3deskey is", key.hex())
     return key[:24]
 
 
@@ -101,8 +97,6 @@ def decrypt3DES(globalSalt, masterPassword, entrySalt, encryptedData):
     k = k1 + k2
     iv = k[-8:]
     key = k[:24]
-    print("key is " + key.hex())
-    print("iv is " + iv.hex())
     return DES3.new(key, DES3.MODE_CBC, iv).decrypt(encryptedData)
 
 
@@ -141,21 +135,22 @@ def dumpJsonLogins(directory, jsonLogins):
         json.dump(jsonLogins, loginf, separators=",:")
 
 
-def exportLogins(key, jsonLogins):
+def exportLogins(key, jsonLogins, fields):
+    """ fields: id, hostname, login, password, timeCreated, timeLastUsed, timePasswordChanged, timesUsed """
     if "logins" not in jsonLogins:
         print("error: no 'logins' key in logins.json", file=sys.stderr)
         return []
     logins = []
     for row in jsonLogins["logins"]:
-        encUsername = row["encryptedUsername"]
-        encPassword = row["encryptedPassword"]
-        logins.append(
-            (
-                row["hostname"],
-                decodeLoginData(key, encUsername),
-                decodeLoginData(key, encPassword),
-            )
-        )
+        blank = {}
+        for field in fields:
+            if field == 'password':
+                blank['password'] = decodeLoginData(key, row["encryptedPassword"])
+            elif field == 'login':
+                blank['login'] = decodeLoginData(key, row["encryptedUsername"])
+            else:
+                blank[field] = row[field]
+        logins.append(blank)
     return logins
 
 
@@ -169,7 +164,11 @@ def readCSV(from_file):
     logins = []
     reader = csv.DictReader(lower_header(from_file))
     for row in reader:
-        logins.append((rawURL(row["url"]), row["username"], row["password"]))
+        logins.append((
+            rawURL(row["url"]),
+            row["username"],
+            row["password"],
+        ))
     return logins
 
 
@@ -178,31 +177,31 @@ def rawURL(url):
     return type(p)(*p[:2], *[""] * 4).geturl()
 
 
-def addNewLogins(key, jsonLogins, logins):
+def addNewLogin(key, jsonLogins, login):
     nextId = jsonLogins["nextId"]
     timestamp = int(datetime.now().timestamp() * 1000)
-    for i, (url, username, password) in enumerate(logins, nextId):
-        entry = {
-            "id": i,
-            "hostname": url,
-            "httpRealm": None,
-            "formSubmitURL": "",
-            "usernameField": "",
-            "passwordField": "",
-            "encryptedUsername": encodeLoginData(key, username),
-            "encryptedPassword": encodeLoginData(key, password),
-            "guid": "{%s}" % uuid4(),
-            "encType": 1,
-            "timeCreated": timestamp,
-            "timeLastUsed": timestamp,
-            "timePasswordChanged": timestamp,
-            "timesUsed": 0,
-        }
-        jsonLogins["logins"].append(entry)
-    jsonLogins["nextId"] += len(logins)
+
+    entry = {
+        "id": nextId,
+        "hostname": login['hostname'],
+        "httpRealm": None,
+        "formSubmitURL": "",
+        "usernameField": "",
+        "passwordField": "",
+        "encryptedUsername": encodeLoginData(key, login['username']),
+        "encryptedPassword": encodeLoginData(key, login['password']),
+        "guid": "{%s}" % uuid4(),
+        "encType": 1,
+        "timeCreated": timestamp,
+        "timeLastUsed": timestamp,
+        "timePasswordChanged": timestamp,
+        "timesUsed": 0,
+    }
+    jsonLogins["logins"].append(entry)
+    jsonLogins["nextId"] += 1
 
 
-def guessDir():
+def findProfiles():
     dirs = {
         "darwin": "~/Library/Application Support/Firefox",
         "linux": "~/.mozilla/firefox",
@@ -214,21 +213,19 @@ def guessDir():
         config = configparser.ConfigParser()
         config.read(path / "profiles.ini")
         profiles = [s for s in config.sections() if "Path" in config[s]]
-        if len(profiles) == 1:
-            profile = config[profiles[0]]
-            ans = path / profile["Path"]
-            print("Using profile:", ans)
-        else:
-            print("There is more than one profile")
-            for key, profile in enumerate(profiles):
-                print(f"{key}: {config[profile]['Name']}")
-            prof_id = int(input("which profile should use? >> "))
-            profile = config[profiles[prof_id]]
-            ans = path / profile["Path"]
 
-        return ans
+        out_profiles = []
+        for profile in profiles:
+            profile_temp = {
+                'path':  path / config[profile]["Path"],
+                'name': config[profile]["Name"]
+            }
+            out_profiles.append(profile_temp)
+
+        return out_profiles
     else:
         print("Automatic profile selection not supported for platform", sys.platform)
+        exit(2)
 
 
 def askpass(directory):
@@ -243,32 +240,3 @@ def askpass(directory):
     return key
 
 
-def main_export(args):
-    try:
-        key = askpass(args.directory)
-    except NoDatabase:
-        # if the database is empty, we are done!
-        return
-    jsonLogins = getJsonLogins(args.directory)
-    logins = exportLogins(key, jsonLogins)
-    writer = csv.writer(args.to_file)
-    writer.writerow(["url", "username", "password"])
-    writer.writerows(logins)
-
-
-def main_import(args):
-    if args.from_file == sys.stdin:
-        try:
-            key = getKey(args.directory)
-        except WrongPassword:
-            # it is not possible to read the password
-            # if stdin is used for input
-            print("Password is not empty. You have to specify FROM_FILE.", file=sys.stderr
-            )
-            sys.exit(1)
-    else:
-        key = askpass(args.directory)
-    jsonLogins = getJsonLogins(args.directory)
-    logins = readCSV(args.from_file)
-    addNewLogins(key, jsonLogins, logins)
-    dumpJsonLogins(args.directory, jsonLogins)
