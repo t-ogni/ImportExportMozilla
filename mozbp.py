@@ -225,29 +225,26 @@ def getLogin(url, login, password, key, jsonLogins):
 
 def findProfiles():
     dirs = {
-        "darwin": "~/Library/Application Support/Firefox",
-        "linux": "~/.mozilla/firefox",
-        "win32": os.path.expandvars(r"%APPDATA%\Mozilla\Firefox"),
-        "cygwin": os.path.expandvars(r"%APPDATA%\Mozilla\Firefox"),
+        "darwin": "~/Library/Application Support/Firefox/Profiles",
+        "linux": "~/.mozilla/firefox/Profiles",
+        "win32": os.path.expandvars(r"%APPDATA%\Mozilla\Firefox\Profiles"),
+        "cygwin": os.path.expandvars(r"%APPDATA%\Mozilla\Firefox\Profiles"),
     }
     if sys.platform in dirs:
         path = Path(dirs[sys.platform]).expanduser()
-        config = configparser.ConfigParser()
-        config.read(path / "profiles.ini")
-        profiles = [s for s in config.sections() if "Path" in config[s]]
-
+        print(path)
+        profiles = list(os.listdir(path=str(path.absolute())))
         out_profiles = []
         for profile in profiles:
             profile_temp = {
-                'path': path / config[profile]["Path"],
-                'name': config[profile]["Name"]
+                'path': path / profile,
+                'name': profile
             }
             out_profiles.append(profile_temp)
 
         return out_profiles
     else:
         print("Automatic profile selection not supported for platform", sys.platform)
-        exit(2)
 
 
 def askpass(directory):

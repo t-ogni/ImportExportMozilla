@@ -50,11 +50,14 @@ while True:
 
     elif com == 'p':
         profile_paths.append(Path(input("path: ")))
-        print("added")
+        print("profile added")
 
     elif com == 'c':
         to_copy = not to_copy
-        print(f'ratio swiched to {to_copy}')
+        if to_copy:
+            print("file will be copied")
+        else:
+            print("nothing will be copied")
 
     else:
         if com.startswith("//"):
@@ -67,7 +70,7 @@ while True:
 
         if path.exists():
             profile_paths.append(path)
-            print("added")
+            print("profile added")
         else:
             print("unknown command")
 
@@ -78,18 +81,19 @@ for ITEM_ID, profile in enumerate(profile_paths):
     print('\t', profile.absolute())
     try:
         key = mozbp.askpass(profile)
+
     except mozbp.NoDatabase:
-        print(f"{ITEM_ID}: this profile has no database")
-        exit(99)
+        print(f"\t\tthis profile has no database")
+        continue
+
     except AttributeError:
-        print(f"{ITEM_ID}: this profile cannot be decrypted (after FF.72)")
-        exit(100)
+        print(f"\t\tthis profile cannot be decrypted (after FF.72)")
+        continue
 
     jsonLogins = mozbp.getJsonLogins(profile)
     json_logins.append(jsonLogins)
     logins = mozbp.exportLogins(key, jsonLogins, ['hostname', 'login', 'password', 'timePasswordChanged'])
     profiles_logins.append(logins)
-
 
 if to_copy:
     print(f"\n copying files to {output_path.absolute()}")
