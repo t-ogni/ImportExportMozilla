@@ -232,15 +232,10 @@ def findProfiles():
     }
     if sys.platform in dirs:
         path = Path(dirs[sys.platform]).expanduser()
-        print(path)
-        profiles = list(os.listdir(path=str(path.absolute())))
         out_profiles = []
-        for profile in profiles:
-            profile_temp = {
-                'path': path / profile,
-                'name': profile
-            }
-            out_profiles.append(profile_temp)
+        for profile in path.iterdir():
+            if profile.is_dir():
+                out_profiles.append(profile)
 
         return out_profiles
     else:
